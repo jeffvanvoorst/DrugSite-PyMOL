@@ -73,12 +73,14 @@ class BaseTable(object):
     """
     if(self.insert_cmd is None): self._setup_insert_cmd()
     if(isinstance(data, (dict,))):
-      tmp = tuple([ data.get(col) for (col, type) in self.fields[1:] ])
+      tmp = tuple([ data.get(col) for (col, type) in self.fields ])
     elif(not isinstance(data, (tuple,))):
       raise ResultStoreError("Data for store_row must be a tuple or dictionary")
     else: 
       tmp = data
-
+    
+    print self.insert_cmd
+    print tmp
     rowid = self.con.execute(self.insert_cmd, tmp).lastrowid
     self.con.commit()
     return rowid
@@ -160,6 +162,7 @@ class BaseTable(object):
 
     return "\nORDER BY %s%s" % (field, order)
 
+
 class FixedFieldsTable(BaseTable):
 
   def __init__(self, con):
@@ -168,11 +171,6 @@ class FixedFieldsTable(BaseTable):
                    ("pymol_selection", "TEXT"),
                    ("target_pdbname", "TEXT"),
                    ("residue_txt", "TEXT"),
-#                   ("seg_lengths" ==> Need array converter <==),
-#                   ("seg_polytypes", "TEXT"),
-#                   ("overlay_id", "INTEGER"), 
-#                   ("residues", "TEXT"),
-#                   ("seg_mapping", "list"),
                   )
     BaseTable.__init__(self, con)
 
@@ -183,8 +181,6 @@ class UserFieldsTable(BaseTable):
     self.name = "user_fields"
     self.fields = (("user_fields_sha1", "TEXT PRIMARY KEY"),
                    ("fixed_fields_sha1", "TEXT"),
-#                   ("name", "TEXT"),
-#                   ("description", "TEXT"),
                    ("inter_tolerance", "REAL"),
                    ("intra_tolerance", "REAL"),
                    ("na_inter_tolerance", "REAL"),
@@ -195,13 +191,12 @@ class UserFieldsTable(BaseTable):
                    ("na_superposition_atoms", "TEXT"),
                    ("date_created", "TEXT"),
                    ("searchabletablename", "TEXT"),
-#                   ("overlay_type", "TEXT"),
                    ("rmslimit", "REAL"),
-                   ("bestsequence", "INTEGER"),
-                   ("best_match_only", "INTEGER"),
-                   ("seg_joins", "TEXT"),
+                   ("bestsequence", "BOOL"),
+                   ("best_match_only", "BOOL"),
+                   ("seg_joins", "list"),
                    ("seg_pattern", "TEXT"),
-                   ("ignore_seg_pattern", "INTEGER"),
+                   ("ignore_seg_pattern", "BOOL"),
                    ("probe_pdblist", "TEXT"),
                   )
     BaseTable.__init__(self, con)

@@ -1,5 +1,7 @@
 import os
+import time
 import sqlite3
+import json
 import Tkinter
 import ttk
 import tkMessageBox
@@ -88,7 +90,6 @@ class ScrollingFrame(Tkinter.Canvas):
     }
     scrollbars["h"].config(orient=Tkinter.HORIZONTAL)
 
-    print "(x,y) scroll:", xscroll, yscroll
     if(xscroll):
       self.config(xscrollcommand=scrollbars["h"].set)
       scrollbars["h"].config(command=self.xview)
@@ -122,9 +123,15 @@ class Data(object):
 
   def __init__(self):
     self.fname = os.path.join(os.path.expanduser('~'), self._fname)
-    self.conn = sqlite3.connect(self.fname)
+    self.conn = sqlite3.connect(
+      self.fname, detect_types=sqlite3.PARSE_DECLTYPES)
     self.conn.row_factory = sqlite3.Row
     self.conn.isolation_level = None
+
+    # Register python2sqlite3 and sqlite32python converters using json
+    sqlite3.register_adapter(list, self._adapt_list)
+    sqlite3.register_converter("list", self._convert_list)
+
     self._init_tables()
 
 
@@ -134,15 +141,18 @@ class Data(object):
     self.searchable = Searchable(self.conn)
 
 
-  def add_target_def(self, pymol_selection, user_fields):
+  def add_target_def(self, pymol_selection, fixed_fields):
     "Add fields used to define the target to the table, indexed by ff_sha1"
 
     self.ff_tbl.store_row((
-      user_fields["fixed_fields_sha1"],
+      fixed_fields["fixed_fields_sha1"],
       pymol_selection,
-      user_fields["pdbname"],
-      user_fields["residue_txt"],
+      fixed_fields["pdbname"],
+      fixed_fields["residue_txt"],
     ))
+
+  def add_search_params(self, user_fields):
+    self.uf_tbl.store_row(user_fields)
 
   def update_searchable(self, rows):
     self.searchable.clear()
@@ -150,6 +160,12 @@ class Data(object):
 
   def searchable_records(self):
     return self.searchable.records()
+
+  def _adapt_list(self, l):
+    return json.dumps(l)
+
+  def _convert_list(self, s):
+    return json.loads(s)
 
 
 class Controller(object):
@@ -167,8 +183,8 @@ class Controller(object):
 
     self.pages["Define Target"].set_on_define_button_pushed_cb(
       self.on_define_structure_button_pushed)
- #   self.pages["Adjust Target"].set_on_search_button_pushed_cb(
- #     self.on_search_button_pushed)
+    self.pages["Adjust Target"].set_on_search_button_pushed_cb(
+      self.on_search_button_pushed)
 
 
   def on_define_structure_button_pushed(self, *args, **kwargs):
@@ -281,12 +297,17 @@ class Controller(object):
     for v in var_names:
       data[v] = float(kwargs[v])
 
+    data["searchabletablename"] = kwargs["searchabletablename"]
+    data["searchable_id"] = 0
     data["fixed_fields_sha1"] = kwargs["fixed_fields_sha1"]
-    print 
-    print "DATA"
-    print data
-    print
     ovly_keys = self.rpc_server.set_user_fields(**data)
+
+    data.update(ovly_keys)
+    data["date_created"] = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    self.data.add_search_params(data)
+
+    # submit search
+    rv = self.rpc_server.request_search(**ovly_keys)
 
 
   def set_adjust_target_entries(self, pymol_selection, target_pdbname,
@@ -494,12 +515,8 @@ class AdjustFrame(TabFrame):
     entries[0].configure(width=30)
     entries.append( 
       ttk.Combobox(frame, textvariable=self.vars["searchabletablename"]) )
-    #tmp = [ row["name"] for row in self.searchable ]
     entries[1]["values"] = [ row["name"] for row in self.searchable ]
     self.vars["searchabletablename"].set("All")
-    print entries[1].configure()
-
-    #print tmp
 
     for i in range(2):
       labs[i].grid(row=i, column=0, padx=2, pady=2, sticky="w")
@@ -670,7 +687,6 @@ class DisplayTargetDef(ttk.Labelframe):
   _padding = (5,5)
 
   def __init__(self, master=None, **kw):
-    print 'inside Display Target Def'
     ttk.Labelframe.__init__(self, master=master, **kw)
     self["padding"] = self._padding
 
