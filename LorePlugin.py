@@ -247,9 +247,6 @@ class Controller(object):
 
     user_fields = self.rpc_server.define_target(
       pdbname=target_pdbname, residue_txt=residue_txt)
-    # if we do not get a good result, we should bail -- should get an 
-    # exception though
-
     self.data.add_target_def(pymol_selection, user_fields)
     my_page = self.pages["Adjust Target"]
     self.set_adjust_target_entries(pymol_selection, target_pdbname, residue_txt)
@@ -380,23 +377,6 @@ class TabFrame(ttk.Frame):
   def update_scroll(self):
     self._scrolling_frame.update_scroll()
 
-#  def __init__(self, master=None, xscroll=False, yscroll=False, 
-#               label="", style="", **kw):
-
-
-#    ScrollingFrame.__init__(self, master, yscroll=True, **kw)
-#    self.frame["padding"] = self._padding
-#    #self.grid(row=0, column=0, padx=10, pady=10, sticky="nesw")
-#    #self.grid(row=0, column=0, padx=10, pady=10, sticky="ne")
-#    #self.update_scroll()
-
-#    #vscroll = ttk.Scrollbar(master, orient="VERTICAL", command=self.yview)
-#    vscroll = ttk.Scrollbar(master, orient=Tkinter.VERTICAL)
-#    vscroll.grid(row=0, column=1, sticky=("N","S"))
-#    self["yscrollcommand"] = vscroll.set
-#    master.grid_columnconfigure(0, weight=1)
-#    master.grid_rowconfigure(0, weight=1)
-
 
   def Labelcheckbutton(self, master, label="", varname="", val=False):
     my_label = ttk.Label(master, text=label)
@@ -482,12 +462,8 @@ class AdjustFrame(TabFrame):
       self.inner_frame, text="Target Substructure Definition")
     search_types = self._setup_search_types_frame()
     filter_types = self._setup_filter_types_frame()
-
-#    self.panes = ttk.Panedwindow(self.inner_frame, orient=Tkinter.VERTICAL)
     match_params = self._setup_match_parameters_frame()
     self.residue_filters = self._setup_residue_filters_frame()
-#    self.panes.add(match_params)
-#    self.panes.add(self.residue_filters)
     self.search_button = ttk.Button(self.inner_frame, text="Search")
 
     self.target_def.grid(row=0, column=0, padx=5, pady=5, sticky="W")
@@ -495,9 +471,6 @@ class AdjustFrame(TabFrame):
     filter_types.grid(row=2, column=0, padx=5, pady=5, sticky="W")
     match_params.grid(row=3, column=0, padx=5, pady=5, sticky="W")
     self.residue_filters.grid(row=4, column=0, padx=5, pady=5, sticky="W")
-
-#    self.panes.grid(row=3, column=0, padx=5, pady=5, sticky="W")
-
     self.search_button.grid(row=5, column=0, padx=5, pady=5, sticky="W")
 
 
@@ -573,11 +546,9 @@ class AdjustFrame(TabFrame):
     "The residue filters will change if target changes..."
 
     new_frame = self._setup_residue_filters_frame(user_fields, padding)
-#    self.panes.forget(self.residue_filters)
     self.residue_filters.grid_forget()
     self.residue_filters.destroy()
     new_frame.grid(**grid_opts)
-#    self.panes.add(new_frame)
     self.residue_filters = new_frame
 
 
@@ -607,7 +578,6 @@ class AdjustFrame(TabFrame):
     seg_start = 0
     for seg_idx, seg_len in enumerate(user_fields["seg_lengths"]):
       res_frame = ttk.Labelframe(frame, text="Residue Segment %s" % (seg_idx))
-      #res_frame["padding"] = (2,2)
     
       seg_stuff = self.Labelentry(
         res_frame, varname="seg_pattern_%s" % (seg_idx), width=2,
@@ -745,7 +715,4 @@ class Notebook(ttk.Notebook):
       self.add(self.pages[tag], text=tag)
       self.pages[tag].rowconfigure(0, weight=1)
       self.pages[tag].columnconfigure(0, weight=1)
-#      self.pages[tag].grid(row=0, column=0, sticky="nw")
       self.pages[tag].update_scroll()
-#    #self.grid(row=0, column=0, padx=10, pady=10, sticky="ne")
-#    #self.update_scroll()
