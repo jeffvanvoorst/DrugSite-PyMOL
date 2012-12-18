@@ -10,7 +10,7 @@ This plugin requires that you either install the jsonrpclib package to the
 PyMOL ext/lib/python2.7/site-packages directory or you use your system's python
 and you will need to install the jsonrpclib package somewhere that your 
 system's python can find it.  
-Next copy the _LoreSqlite.py file to your PyMOL ext/lib/python2.7/site-packages/Lore directory and create an __init__.py file in that directory that imports
+Next copy the \_LoreSqlite.py file to your PyMOL ext/lib/python2.7/site-packages/Lore directory and create an \_\_init\_\_.py file in that directory that imports
 the necessary modules.
 Finally, copy the LorePlugin.py file to your PyMOL modules/pmg_tk/startup
 directory.
