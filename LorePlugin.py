@@ -109,15 +109,11 @@ class ScrollingFrame(Tkinter.Canvas):
     self.frame.columnconfigure(0, weight=1)
 
     # Anchor the frame to the NW corner of the canvas
-    self.create_window(0, 0, anchor="center", window=self.frame)
-
-#    #try throwing in a sizegrip
-#    ttk.Sizegrip(master).grid(row=1, column=1, sticky="se")
+    self.create_window(0, 0, anchor="nw", window=self.frame)
 
   def update_scroll(self):
     "Need to update idletasks and bbox after gridding widgets into the frame"
     self.update_idletasks()
-    print "bbox:", self.bbox("all")
     self.config(scrollregion=self.bbox("all"))
 
 
@@ -244,6 +240,7 @@ class Controller(object):
     self.update_adjust_target_match_filters(my_page, user_fields)
     self.update_adjust_target_match_params(my_page, user_fields)
     my_page.update_residue_filters_frame(user_fields)
+    my_page.update_scroll()
 
 
   def do_search(self, **kwargs):
@@ -330,7 +327,6 @@ class MainWindow(Tkinter.Toplevel):
   }
   _title = "Lore Substructure Searching"
   _geometry = "600x480+200+200"
-#  _geometry = "200x180+200+200"
 
   def __init__(self, master, cnf={}, **kw):
     self.searchable = kw.pop("searchable")
@@ -341,12 +337,9 @@ class MainWindow(Tkinter.Toplevel):
     Tkinter.Toplevel.__init__(self, master, cnf=cnf, **kw)
     self.title(self._title)
     self.geometry(self._geometry)
-
-    # try canvas here
-
-    #ttk.Sizegrip(self).grid(row=999, column=999, sticky=("S","E"))
     self.notebook = Notebook(self)
-    self.notebook.grid(sticky="news")
+    self.notebook.grid(row=0, column=0, sticky="news")
+    ttk.Sizegrip(self).grid(row=1, column=1, sticky=("S","E"))
 
 
 class TabFrame(ttk.Frame):
@@ -465,30 +458,30 @@ class AdjustFrame(TabFrame):
     self.vars = {}
   
     self.target_def = DisplayTargetDef(
-      self.frame, text="Target Substructure Definition")
+      self.inner_frame, text="Target Substructure Definition")
     search_types = self._setup_search_types_frame()
     filter_types = self._setup_filter_types_frame()
 
-    self.panes = ttk.Panedwindow(self.frame, orient=Tkinter.VERTICAL)
+#    self.panes = ttk.Panedwindow(self.inner_frame, orient=Tkinter.VERTICAL)
     match_params = self._setup_match_parameters_frame()
     self.residue_filters = self._setup_residue_filters_frame()
-    self.panes.add(match_params)
-    self.panes.add(self.residue_filters)
-    self.search_button = ttk.Button(self.frame, text="Search")
+#    self.panes.add(match_params)
+#    self.panes.add(self.residue_filters)
+    self.search_button = ttk.Button(self.inner_frame, text="Search")
 
     self.target_def.grid(row=0, column=0, padx=5, pady=5, sticky="W")
     search_types.grid(row=1, column=0, padx=5, pady=5, sticky="W")
     filter_types.grid(row=2, column=0, padx=5, pady=5, sticky="W")
-#    match_params.grid(row=3, column=0, padx=5, pady=5, sticky="W")
-#    self.residue_filters.grid(row=4, column=0, padx=5, pady=5, sticky="W")
+    match_params.grid(row=3, column=0, padx=5, pady=5, sticky="W")
+    self.residue_filters.grid(row=4, column=0, padx=5, pady=5, sticky="W")
 
-    self.panes.grid(row=3, column=0, padx=5, pady=5, sticky="W")
+#    self.panes.grid(row=3, column=0, padx=5, pady=5, sticky="W")
 
     self.search_button.grid(row=5, column=0, padx=5, pady=5, sticky="W")
 
 
   def _setup_search_types_frame(self):
-    frame = ttk.Labelframe(self.frame, text="Search Types")
+    frame = ttk.Labelframe(self.inner_frame, text="Search Types")
     frame["padding"] = (5,5)
 
     labs = [ ttk.Label(frame, text="List of Lore Structure Names:") ]
@@ -543,7 +536,7 @@ class AdjustFrame(TabFrame):
 
   def _setup_match_params(self, frame_label, labels, var_names, desc, 
                           padding=(5,5)):
-    frame = ttk.Labelframe(self.panes, text=frame_label)
+    frame = ttk.Labelframe(self.inner_frame, text=frame_label)
     frame["padding"] = padding
 
     for i in range(len(labels)):
@@ -563,16 +556,16 @@ class AdjustFrame(TabFrame):
     "The residue filters will change if target changes..."
 
     new_frame = self._setup_residue_filters_frame(user_fields, padding)
-    self.panes.forget(self.residue_filters)
-#    self.residue_filters.grid_forget()
+#    self.panes.forget(self.residue_filters)
+    self.residue_filters.grid_forget()
     self.residue_filters.destroy()
-#    new_frame.grid(**grid_opts)
-    self.panes.add(new_frame)
+    new_frame.grid(**grid_opts)
+#    self.panes.add(new_frame)
     self.residue_filters = new_frame
 
 
   def _setup_residue_filters_frame(self, user_fields={}, padding=(5,5)):
-    frame = ttk.Labelframe(self.panes, text="Residue Filters")
+    frame = ttk.Labelframe(self.inner_frame, text="Residue Filters")
     frame["padding"] = padding
     if(not user_fields): 
       return frame
@@ -646,7 +639,7 @@ class AdjustFrame(TabFrame):
 
 
   def _setup_filter_types_frame(self):
-    frame = ttk.Labelframe(self.frame, text="Match Filters")
+    frame = ttk.Labelframe(self.inner_frame, text="Match Filters")
     frame["padding"] = (5,5)
 
     txt = [
@@ -716,7 +709,7 @@ class Notebook(ttk.Notebook):
 
   _panels = {
     "Define Target": DefineFrame,
-    #"Adjust Target": AdjustFrame,
+    "Adjust Target": AdjustFrame,
   }
 
   def __init__(self, master=None, **kw):
