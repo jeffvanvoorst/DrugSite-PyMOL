@@ -30,6 +30,8 @@ class JSONRPCThread(threading.Thread):
 
   def request(self, *args, **kwargs):
     rv = self.rpc_server._request(self.methodname, kwargs)
+    if(type(rv) == list):
+      rv = {"result": rv}
     rv["methodname"] = self.methodname
     self.queue.put(json.dumps(rv))
   
@@ -235,6 +237,7 @@ class Controller(MainThreadConsumer):
 
     self.methods = {
       "search_metadata": self.update_search_metadata,
+      "matches": self.update_search_results,
     }
 
 
@@ -394,6 +397,7 @@ class Controller(MainThreadConsumer):
   def update_search_metadata(self, response={}):
     self.pages["Search Results"].set_search_status(**response)
     if(response.get("search_is_pending", 0) == 0): 
+      self.request_search_results()
       return
 
     uf_sha1 = self.data.current_results_keys["user_fields_sha1"]
@@ -402,6 +406,21 @@ class Controller(MainThreadConsumer):
       queue=self.queue, kwargs=dict(user_fields_sha1=uf_sha1)
     )
     self.root.after(2000, t.start)
+
+
+  def request_search_results(self, user_fields_sha1=""):
+    if(not user_fields_sha1):
+      user_fields_sha1 = self.data.current_results_keys["user_fields_sha1"]
+    t = JSONRPCThread(
+      rpc_server=self.rpc_server, methodname="matches", 
+      queue=self.queue, kwargs=dict(user_fields_sha1=user_fields_sha1)
+    )
+    t.start()
+
+
+  def update_search_results(self, response={}):
+    for r in response["result"]:
+      print r
 
 
 class MainWindow(Tkinter.Toplevel):
