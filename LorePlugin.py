@@ -5,6 +5,8 @@ import json
 import Tkinter
 import ttk
 import tkMessageBox
+import threading
+import Queue
 
 import jsonrpclib
 from LoreClient import FixedFieldsTable, UserFieldsTable, Searchable
@@ -14,6 +16,44 @@ def __init__(self, LoreURL="http://drugsite-dev.msi.umn.edu/mmLore/jsonrpc"):
   self.menuBar.addmenuitem(
     'Plugin', 'command', 'Controller', label='TEST',
     command = lambda s=self, url=LoreURL: Controller(s, url))
+
+
+class JSONRPCThread(threading.Thread):
+
+  def __init__(self, rpc_server="", methodname="", queue=None, args=(), 
+               kwargs={}):
+    threading.Thread.__init__(self, group=None, target=self.request, name=None,
+                              args=args, kwargs=kwargs)
+    self.rpc_server = rpc_server
+    self.methodname = methodname
+    self.queue = queue
+
+  def request(self, *args, **kwargs):
+    # I think we are goign to need to get an rpcid
+    rv = self.rpc_server._request(self.methodname, kwargs)
+    rv["methodname"] = self.methodname
+    self.queue.put(json.dumps(rv))
+  
+
+class MainThreadConsumer(object):
+  _loop_sleep = 100
+
+  def __init__(self, root=None):
+    self.root = root
+    self.queue = Queue.Queue()
+    self.check_queue()
+    self.methods = {}
+    
+  def check_queue(self):
+    # Easiest method to use when using nonblocking get
+    try:
+      data = json.loads(self.queue.get_nowait())
+      mthd = data.pop("methodname")
+      self.methods[mthd](response=data)
+    except Queue.Empty:
+       pass
+
+    self.root.after(self._loop_sleep, self.check_queue)
 
 
 class LoreException(Exception):
@@ -134,6 +174,9 @@ class Data(object):
 
     self._init_tables()
 
+    self.current_results_keys = dict(user_fields_sha1="", fixed_fields_sha1="")
+    self.current_target = dict(user_fields_sha1="", fixed_fields_sha1="")
+
 
   def _init_tables(self):
     self.uf_tbl = UserFieldsTable(self.conn)
@@ -158,6 +201,10 @@ class Data(object):
     self.searchable.clear()
     self.searchable.store_many_rows(rows)
 
+  def set_current_results_keys(self, user_fields_sha1="", fixed_fields_sha1=""):
+    self.current_results_keys = dict(
+      user_fields_sha1=user_fields_sha1, fixed_fields_sha1=fixed_fields_sha1)
+    
   def searchable_records(self):
     return self.searchable.records()
 
@@ -168,10 +215,11 @@ class Data(object):
     return json.loads(s)
 
 
-class Controller(object):
+class Controller(MainThreadConsumer):
   
   def __init__(self, app, 
                LoreURL="http://drugsite-dev.msi.umn.edu/mmLore/jsonrpc"):
+    MainThreadConsumer.__init__(self, root=app.root)
     self.LoreURL = LoreURL
     self.rpc_server = jsonrpclib.Server(LoreURL)
     self.data = Data()
@@ -185,6 +233,10 @@ class Controller(object):
       self.on_define_structure_button_pushed)
     self.pages["Adjust Target"].set_on_search_button_pushed_cb(
       self.on_search_button_pushed)
+
+    self.methods = {
+      "search_metadata": self.update_search_metadata,
+    }
 
 
   def on_define_structure_button_pushed(self, *args, **kwargs):
@@ -305,6 +357,11 @@ class Controller(object):
 
     # submit search
     rv = self.rpc_server.request_search(**ovly_keys)
+    print "ovly_keys:", ovly_keys
+    self.data.set_current_results_keys(**ovly_keys)
+      #user_fields_sha1=ovly_keys["user_fields_sha1"], 
+      #fixed_fields_sha1=ovly_keys["fixed_fields_sha1"],)
+    self.update_search_metadata()
 
 
   def set_adjust_target_entries(self, pymol_selection, target_pdbname,
@@ -337,6 +394,33 @@ class Controller(object):
     # yea!, have to swap order
     tmp = [ (s[1], s[0]) for s in subsets ]
     self.data.update_searchable(tmp)
+
+
+  def update_search_metadata(self, response={}):
+    if(response):
+      print
+      print "remote reponse:"
+      for k,v in response.iteritems():
+        print k,v
+      print
+      # update tk vars in results panel
+
+#    if(self.num_searched > 0 and 
+#       self.num_searched == metadata["num_searched"]):
+#      self.times_num_searched_stayed_the_same += 1
+#    else:
+#      self.num_searched = metadata["num_searched"]
+#      self.times_num_searched_stayed_the_same = 0
+#
+#    if(metadata["search_is_pending"] == 1 and 
+#       self.times_num_searched_stayed_the_same < self._stayed_the_same_max):
+
+    uf_sha1 = self.data.current_results_keys["user_fields_sha1"]
+    t = JSONRPCThread(
+      rpc_server=self.rpc_server, methodname="search_metadata", 
+      queue=self.queue, kwargs=dict(user_fields_sha1=uf_sha1)
+    )
+    self.root.after(2000, t.start())
 
 
 class MainWindow(Tkinter.Toplevel):
@@ -686,7 +770,6 @@ class DisplayTargetDef(ttk.Labelframe):
     for rowno, i in enumerate(grid_idz):
       self.labels[i].grid(row=rowno, sticky="W", padx=2, pady=2)
       self.values[i].grid(row=rowno, column=1, sticky="W", padx=2, pady=2)
-
 
 
 class Notebook(ttk.Notebook):
