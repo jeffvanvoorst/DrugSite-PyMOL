@@ -35,7 +35,7 @@ class JSONRPCThread(threading.Thread):
   
 
 class MainThreadConsumer(object):
-  _loop_sleep = 100
+  _loop_sleep = 250
 
   def __init__(self, root=None):
     self.root = root
@@ -274,8 +274,7 @@ class Controller(MainThreadConsumer):
       # easier to debug during development if we raise the exception
       raise
     else:
-      pass # need to implement 3rd page
-      #self.window.notebook.select(2)
+      self.window.notebook.select(2)
 
     if("widget" in kwargs):
       _brutally_set_state(kwargs["widget"], state='normal')
@@ -357,7 +356,7 @@ class Controller(MainThreadConsumer):
     # submit search
     rv = self.rpc_server.request_search(**ovly_keys)
     self.data.set_current_results_keys(**ovly_keys)
-    self.update_search_metadata()
+    self.update_search_metadata(response=dict(search_is_pending=1))
 
 
   def set_adjust_target_entries(self, pymol_selection, target_pdbname,
@@ -393,23 +392,16 @@ class Controller(MainThreadConsumer):
 
 
   def update_search_metadata(self, response={}):
-    if(response):
-      print
-      print "remote reponse:"
-      for k,v in response.iteritems():
-        print k,v
-      print
-      # need to set tk vars
-
-      if(response.get("search_is_pending", 0) == 0): 
-        return
+    self.pages["Search Results"].set_search_status(**response)
+    if(response.get("search_is_pending", 0) == 0): 
+      return
 
     uf_sha1 = self.data.current_results_keys["user_fields_sha1"]
     t = JSONRPCThread(
       rpc_server=self.rpc_server, methodname="search_metadata", 
       queue=self.queue, kwargs=dict(user_fields_sha1=uf_sha1)
     )
-    self.root.after(2000, t.start())
+    self.root.after(2000, t.start)
 
 
 class MainWindow(Tkinter.Toplevel):
@@ -761,14 +753,50 @@ class DisplayTargetDef(ttk.Labelframe):
       self.values[i].grid(row=rowno, column=1, sticky="W", padx=2, pady=2)
 
 
+class SearchResultsFrame(TabFrame):
+
+  def __init__(self, master=None, **kw):
+    self.searchable = master.searchable
+    TabFrame.__init__(self, master=master, **kw)
+    self.vars = {}
+
+    search_status = self._setup_search_status_frame()
+    
+    search_status.grid(row=0, column=0, sticky="W", padx=5, pady=5)
+
+
+  def set_search_status(self, num_searched=0, num_probe_structs=0, 
+                        search_is_pending=0, **kwargs):
+    if(int(search_is_pending) == 1):
+      if(num_searched == 0):
+        self.search_status_label.configure(text="Search is pending")
+      else:
+        msg = "Searched %s of %s structures"
+        self.search_status_label.configure(
+          text=msg % (num_searched, num_probe_structs))
+    else:
+      self.search_status_label.configure(
+        text="Searched a total of %s structures" % (num_searched))
+
+
+  def _setup_search_status_frame(self, padding=(5,5)):
+    frame = ttk.Labelframe(self.inner_frame, text="Search Status")
+    frame["padding"] = padding
+    self.search_status_label = ttk.Label(
+      frame, text="No search is in progress, and no search was requested")
+    self.search_status_label.grid(padx=2, pady=2, sticky="W")
+    return frame
+
+
 class Notebook(ttk.Notebook):
   _panel_borderwidth="2"
   _panel_relief="groove"
 
-  _panels = {
-    "Define Target": DefineFrame,
-    "Adjust Target": AdjustFrame,
-  }
+  _panels = [
+    ("Define Target", DefineFrame),
+    ("Adjust Target", AdjustFrame),
+    ("Search Results", SearchResultsFrame),
+  ]
 
   def __init__(self, master=None, **kw):
     ttk.Notebook.__init__(self, master=master, **kw)
@@ -782,7 +810,8 @@ class Notebook(ttk.Notebook):
     master.grid_columnconfigure(0, weight=1)
 
     self.pages = {}
-    for (tag, klass) in self._panels.iteritems():
+    #for (tag, klass) in self._panels.iteritems():
+    for (tag, klass) in self._panels:
       self.pages[tag] = klass(self, style="Notebook.TFrame")
       self.add(self.pages[tag], text=tag)
       self.pages[tag].rowconfigure(0, weight=1)
