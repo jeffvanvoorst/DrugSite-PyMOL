@@ -29,7 +29,6 @@ class JSONRPCThread(threading.Thread):
     self.queue = queue
 
   def request(self, *args, **kwargs):
-    # I think we are goign to need to get an rpcid
     rv = self.rpc_server._request(self.methodname, kwargs)
     rv["methodname"] = self.methodname
     self.queue.put(json.dumps(rv))
@@ -357,10 +356,7 @@ class Controller(MainThreadConsumer):
 
     # submit search
     rv = self.rpc_server.request_search(**ovly_keys)
-    print "ovly_keys:", ovly_keys
     self.data.set_current_results_keys(**ovly_keys)
-      #user_fields_sha1=ovly_keys["user_fields_sha1"], 
-      #fixed_fields_sha1=ovly_keys["fixed_fields_sha1"],)
     self.update_search_metadata()
 
 
@@ -403,17 +399,10 @@ class Controller(MainThreadConsumer):
       for k,v in response.iteritems():
         print k,v
       print
-      # update tk vars in results panel
+      # need to set tk vars
 
-#    if(self.num_searched > 0 and 
-#       self.num_searched == metadata["num_searched"]):
-#      self.times_num_searched_stayed_the_same += 1
-#    else:
-#      self.num_searched = metadata["num_searched"]
-#      self.times_num_searched_stayed_the_same = 0
-#
-#    if(metadata["search_is_pending"] == 1 and 
-#       self.times_num_searched_stayed_the_same < self._stayed_the_same_max):
+      if(response.get("search_is_pending", 0) == 0): 
+        return
 
     uf_sha1 = self.data.current_results_keys["user_fields_sha1"]
     t = JSONRPCThread(
