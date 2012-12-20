@@ -5,6 +5,7 @@ import json
 import Tkinter
 import ttk
 import tkMessageBox
+import tkFont
 import threading
 import Queue
 
@@ -16,6 +17,17 @@ def __init__(self, LoreURL="http://drugsite-dev.msi.umn.edu/mmLore/jsonrpc"):
   self.menuBar.addmenuitem(
     'Plugin', 'command', 'Controller', label='TEST',
     command = lambda s=self, url=LoreURL: Controller(s, url))
+
+
+# A simple namespace to hold ttk and Tkinter configs
+class MyConfig:
+  FixedFont = tkFont.Font(family="Courier", size=14)
+
+  
+#    _style = ttk.Style()
+#    _style.configure("Notebook.TFrame", borderwidth=self._panel_borderwidth,
+#                     relief=self._panel_relief)
+
 
 
 class JSONRPCThread(threading.Thread):
@@ -142,21 +154,19 @@ class ScrollingFrame(Tkinter.Canvas):
       self.config(yscrollcommand=scrollbars["v"].set)
       scrollbars["v"].config(command=self.yview)
 
-#    # make the canvas expandable
-#    master.grid_rowconfigure(0, weight=1)
-#    master.grid_columnconfigure(0, weight=1)
-
     # Create a frame for the contents
     if(label):
       self.frame = ttk.Labelframe(self, text=label, style=style)
     else:
       self.frame = ttk.Frame(self, style=style)
-#    self.frame.rowconfigure(0, weight=1)
-#    self.frame.columnconfigure(0, weight=1)
+    self.frame.rowconfigure(0, weight=1)
+    self.frame.columnconfigure(0, weight=1)
 
     # Anchor the frame to the NW corner of the canvas
     self.create_window(0, 0, anchor="nw", window=self.frame)
-    self.bind('<Configure>', self.resize_frame_cb)
+
+    # Need to debug why the rows aren't stetching ...
+    #self.bind('<Configure>', self.resize_frame_cb)
 
   def update_scroll(self):
     "Need to update idletasks and bbox after gridding widgets into the frame"
@@ -168,9 +178,10 @@ class ScrollingFrame(Tkinter.Canvas):
     "Update the width of the frame if the canvas's width > than bbox(ALL)" 
     bbox = self.bbox("all")
     min_w = bbox[2] - bbox[0]
+    height = bbox[3] - bbox[1]
     canvas_w = self.winfo_width()
-#    if(canvas_w > min_w):
-#      self.frame.configure(width=canvas_w)
+    if(canvas_w > min_w):
+       self.frame.configure(width=canvas_w, height=height)
 
     cv = event.widget
     (x, y) = (cv.canvasx(event.x), cv.canvasy(event.y))
@@ -476,12 +487,10 @@ class TabFrame(ttk.Frame):
     ttk.Frame.__init__(self, master=master, **kw)
     self["padding"] = self._padding
 
-#    master.grid_rowconfigure(0, weight=1)
-#    master.grid_columnconfigure(0, weight=1)
-
     self._scrolling_frame = ScrollingFrame(
       self, sb_master=self, yscroll=True)
     self._scrolling_frame.grid(row=0, column=0, sticky="news")
+    self._scrolling_frame.columnconfigure(0, weight=1)
     self.inner_frame = self._scrolling_frame.frame
 
   def update_scroll(self):
@@ -559,6 +568,16 @@ define a target substructure
   def set_on_define_button_pushed_cb(self, cb):
     self.define_button.configure(
       command=lambda s=self: cb(widget=s, vars=s.vars))
+
+
+class SeqBox(ttk.Frame):
+
+  def __init__(self, master=None, resname="", seq="", **kw):
+    ttk.Frame.__init__(self, master, **kw)
+    my_res = ttk.Label(self, text=resname) 
+    my_seq = ttk.Label(self, text=seq, font=MyConfig.FixedFont)
+    my_res.grid(row=0, column=0, sticky="we", padx=2, pady=2)
+    my_seq.grid(row=1, column=0, sticky="we", padx=2, pady=2)
 
 
 class AdjustFrame(TabFrame):
@@ -852,7 +871,7 @@ class SearchResultsFrame(TabFrame):
     if(search_results):
       for i, h in enumerate(headings):
         h = ttk.Label(frame, text=h)
-        h.grid(row=0, column=i+1, padx=2, pady=2, sticky="W")
+        h.grid(row=0, column=i+1, padx=2, pady=2, sticky="nw")
 
       for i,r in enumerate(search_results):
          # setup checkbox
@@ -865,13 +884,13 @@ class SearchResultsFrame(TabFrame):
            ttk.Label(frame, text="%.2f" % (r[4])),
            ttk.Label(frame, text=r[2]),
          )
+         for (resname, seq) in zip(r[6], r[7]):
+           my_row += (SeqBox(frame, resname, seq), )
+
          for j,c in enumerate(my_row):
            c.grid(row=i+1, column=j, padx=2, pady=2, sticky="W")
 
     return frame
-
-
-
 
 
 class Notebook(ttk.Notebook):
