@@ -122,12 +122,16 @@ class ScrollingFrame(Tkinter.Canvas):
   :param kw: keywords to pass to ttk.Canvas
   """
 
-  def __init__(self, master=None, xscroll=False, yscroll=False, 
-               label="", style="", **kw):
+  def __init__(self, master=None, sb_master=None, xscroll=False, 
+               yscroll=False, label="", style="", **kw):
     Tkinter.Canvas.__init__(self, master, **kw)
+
+    my_sb_master = master
+    if(sb_master is not None):
+      my_sb_master = sb_master
     scrollbars = {
-      "v": AutoScrollbar(master, grid_row=0, grid_column=1, sticky="ns"),
-      "h": AutoScrollbar(master, grid_row=1, grid_column=0, sticky="ew"),
+      "v": AutoScrollbar(my_sb_master, grid_row=0, grid_column=1, sticky="ns"),
+      "h": AutoScrollbar(my_sb_master, grid_row=1, grid_column=0, sticky="ew"),
     }
     scrollbars["h"].config(orient=Tkinter.HORIZONTAL)
 
@@ -138,25 +142,44 @@ class ScrollingFrame(Tkinter.Canvas):
       self.config(yscrollcommand=scrollbars["v"].set)
       scrollbars["v"].config(command=self.yview)
 
-    # make the canvas expandable
-    master.grid_rowconfigure(0, weight=1)
-    master.grid_columnconfigure(0, weight=1)
+#    # make the canvas expandable
+#    master.grid_rowconfigure(0, weight=1)
+#    master.grid_columnconfigure(0, weight=1)
 
     # Create a frame for the contents
     if(label):
       self.frame = ttk.Labelframe(self, text=label, style=style)
     else:
       self.frame = ttk.Frame(self, style=style)
-    self.frame.rowconfigure(0, weight=1)
-    self.frame.columnconfigure(0, weight=1)
+#    self.frame.rowconfigure(0, weight=1)
+#    self.frame.columnconfigure(0, weight=1)
 
     # Anchor the frame to the NW corner of the canvas
     self.create_window(0, 0, anchor="nw", window=self.frame)
+    self.bind('<Configure>', self.resize_frame_cb)
 
   def update_scroll(self):
     "Need to update idletasks and bbox after gridding widgets into the frame"
     self.update_idletasks()
     self.config(scrollregion=self.bbox("all"))
+
+
+  def resize_frame_cb(self, event):
+    "Update the width of the frame if the canvas's width > than bbox(ALL)" 
+    bbox = self.bbox("all")
+    min_w = bbox[2] - bbox[0]
+    canvas_w = self.winfo_width()
+#    if(canvas_w > min_w):
+#      self.frame.configure(width=canvas_w)
+
+    cv = event.widget
+    (x, y) = (cv.canvasx(event.x), cv.canvasy(event.y))
+    print "configure cb", x,y, cv.find_closest(x,y)
+    print "bbox(ALL)", self.bbox("all")
+    print "bbox(CURRENT)", self.bbox("all")
+    print "winfo height, width", self.winfo_height(), self.winfo_width()
+    print "frame height, width", self.frame.winfo_height(), self.frame.winfo_width()
+    
 
 
 class Data(object):
@@ -449,14 +472,15 @@ class MainWindow(Tkinter.Toplevel):
 class TabFrame(ttk.Frame):
   _padding = (7,7)
 
-  def __init__(self, master=None, **kw):
+  def __init__(self, master=None, sb_master=None, **kw):
     ttk.Frame.__init__(self, master=master, **kw)
     self["padding"] = self._padding
 
-    master.grid_rowconfigure(0, weight=1)
-    master.grid_columnconfigure(0, weight=1)
+#    master.grid_rowconfigure(0, weight=1)
+#    master.grid_columnconfigure(0, weight=1)
 
-    self._scrolling_frame = ScrollingFrame(self, yscroll=True)
+    self._scrolling_frame = ScrollingFrame(
+      self, sb_master=self, yscroll=True)
     self._scrolling_frame.grid(row=0, column=0, sticky="news")
     self.inner_frame = self._scrolling_frame.frame
 
@@ -516,8 +540,8 @@ define a target substructure
     "target_pdbname": __lore_selection_txt,
   }
 
-  def __init__(self, master=None, **kw):
-    TabFrame.__init__(self, master=master, **kw)
+  def __init__(self, master=None, sb_master=None, **kw):
+    TabFrame.__init__(self, master=master, sb_master=sb_master, **kw)
 
     self.vars = {}
     rowno=0
@@ -528,7 +552,7 @@ define a target substructure
       my_entry.grid(row=rowno, column=1, padx=2, pady=2, sticky="we")
       rowno += 1
     self.define_button = ttk.Button(self.inner_frame, text="Define Target")
-    self.define_button.grid(row=rowno, column=1, padx=5, pady=5)
+    self.define_button.grid(row=rowno, column=1, padx=5, pady=5, sticky="w")
     self.inner_frame.columnconfigure(1, weight=1)
 
 
@@ -539,9 +563,9 @@ define a target substructure
 
 class AdjustFrame(TabFrame):
 
-  def __init__(self, master=None, **kw):
+  def __init__(self, master=None, sb_master=None, **kw):
+    TabFrame.__init__(self, master=master, sb_master=sb_master, **kw)
     self.searchable = master.searchable
-    TabFrame.__init__(self, master=master, **kw)
     self.vars = {}
   
     self.target_def = DisplayTargetDef(
@@ -776,9 +800,9 @@ class DisplayTargetDef(ttk.Labelframe):
 
 class SearchResultsFrame(TabFrame):
 
-  def __init__(self, master=None, **kw):
+  def __init__(self, master=None, sb_master=None, **kw):
+    TabFrame.__init__(self, master=master, sb_master=sb_master, **kw)
     self.searchable = master.searchable
-    TabFrame.__init__(self, master=master, **kw)
     self.vars = {}
 
     search_status = self._setup_search_status_frame()
@@ -872,10 +896,9 @@ class Notebook(ttk.Notebook):
     master.grid_columnconfigure(0, weight=1)
 
     self.pages = {}
-    #for (tag, klass) in self._panels.iteritems():
     for (tag, klass) in self._panels:
-      self.pages[tag] = klass(self, style="Notebook.TFrame")
+      self.pages[tag] = klass(self, master, style="Notebook.TFrame")
       self.add(self.pages[tag], text=tag)
+      self.pages[tag].update_scroll()
       self.pages[tag].rowconfigure(0, weight=1)
       self.pages[tag].columnconfigure(0, weight=1)
-      self.pages[tag].update_scroll()
