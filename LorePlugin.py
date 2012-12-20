@@ -419,8 +419,10 @@ class Controller(MainThreadConsumer):
 
 
   def update_search_results(self, response={}):
+    self.pages["Search Results"].update_search_results(response["result"])
     for r in response["result"]:
       print r
+    self.pages["Search Results"].update_scroll()
 
 
 class MainWindow(Tkinter.Toplevel):
@@ -780,6 +782,7 @@ class SearchResultsFrame(TabFrame):
     self.vars = {}
 
     search_status = self._setup_search_status_frame()
+    self.search_results = None
     
     search_status.grid(row=0, column=0, sticky="W", padx=5, pady=5)
 
@@ -798,6 +801,16 @@ class SearchResultsFrame(TabFrame):
         text="Searched a total of %s structures" % (num_searched))
 
 
+  def update_search_results(self, search_results=[]):
+    frame = self._setup_search_results_frame(search_results)
+
+    if(self.search_results):
+      self.search_results.grid_forget()
+      self.search_results.destroy()
+    self.search_results = frame
+    self.search_results.grid(row=1, column=0, sticky="W", padx=5, pady=5)
+
+
   def _setup_search_status_frame(self, padding=(5,5)):
     frame = ttk.Labelframe(self.inner_frame, text="Search Status")
     frame["padding"] = padding
@@ -805,6 +818,36 @@ class SearchResultsFrame(TabFrame):
       frame, text="No search is in progress, and no search was requested")
     self.search_status_label.grid(padx=2, pady=2, sticky="W")
     return frame
+
+
+  def _setup_search_results_frame(self, search_results=[], padding=(5,5)):
+    frame = ttk.Labelframe(self.inner_frame, text="Search Results")
+    frame["padding"] = padding
+
+    headings = ["RMSD", "Sequence\nScore", "Match\nName", "Aligned Segments"]
+    if(search_results):
+      for i, h in enumerate(headings):
+        h = ttk.Label(frame, text=h)
+        h.grid(row=0, column=i+1, padx=2, pady=2, sticky="W")
+
+      for i,r in enumerate(search_results):
+         # setup checkbox
+         varname = "rowid_%s" % (r[0])
+         self.vars[varname] = Tkinter.BooleanVar()
+         self.vars[varname].set(False)
+         my_row = (
+           ttk.Checkbutton(frame, variable=self.vars[varname]), 
+           ttk.Label(frame, text="%.2f" % (r[3])),
+           ttk.Label(frame, text="%.2f" % (r[4])),
+           ttk.Label(frame, text=r[2]),
+         )
+         for j,c in enumerate(my_row):
+           c.grid(row=i+1, column=j, padx=2, pady=2, sticky="W")
+
+    return frame
+
+
+
 
 
 class Notebook(ttk.Notebook):
